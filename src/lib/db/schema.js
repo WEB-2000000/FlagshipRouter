@@ -159,3 +159,27 @@ export function buildCreateTableSql(name, def) {
   if (def.primaryKey) cols.push(def.primaryKey);
   return `CREATE TABLE IF NOT EXISTS ${name} (${cols.join(", ")})`;
 }
+
+function postgresColumnDefinition(definition, columnNames) {
+  let output = definition
+    .replace(/\bINTEGER\s+PRIMARY KEY\s+AUTOINCREMENT\b/i, "SERIAL PRIMARY KEY")
+    .replace(/\bREAL\b/gi, "DOUBLE PRECISION");
+  const names = new Set(columnNames);
+  return output.replace(/\bCHECK\s*\(([^()]*)\)/gi, (match, expression) =>
+    `CHECK (${expression.replace(/\b[A-Za-z_][\w]*\b/g, (token) => names.has(token) ? `"${token}"` : token)})`,
+  );
+}
+
+export function buildCreateTablePostgresSql(name, def) {
+  const columnNames = Object.keys(def.columns);
+  const columns = Object.entries(def.columns).map(
+    ([columnName, definition]) => `"${columnName}" ${postgresColumnDefinition(definition, columnNames)}`,
+  );
+  if (def.primaryKey) {
+    const primaryKey = def.primaryKey.replace(/\(([^()]*)\)/, (_, columns) =>
+      `(${columns.split(",").map((column) => `"${column.trim()}"`).join(", ")})`,
+    );
+    columns.push(primaryKey);
+  }
+  return `CREATE TABLE IF NOT EXISTS "${name}" (${columns.join(", ")})`;
+}

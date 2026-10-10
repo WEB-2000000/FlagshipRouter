@@ -1,0 +1,15 @@
+# Recreated by the remote Vercel build; never upload local dependency/build caches.
+node_modules
+.next
+.next-cli-build
+coverage
+
+# Local database, backups, project linkage and credentials are not deployment inputs.
+data
+.vercel
+.git
+.env*
+!.env.example
+
+# Local diagnostic logs.
+*.log
