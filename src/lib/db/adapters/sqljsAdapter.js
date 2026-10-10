@@ -19,6 +19,8 @@ export async function createSqlJsAdapter(filePath) {
 
   let dirty = false;
   let saveTimer = null;
+  let transactionDepth = 0;
+  const dirtyBeforeTransaction = [];
   const SAVE_DEBOUNCE_MS = 100;
 
   function persist() {
@@ -29,10 +31,11 @@ export async function createSqlJsAdapter(filePath) {
 
   function scheduleSave() {
     dirty = true;
+    if (transactionDepth > 0) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      if (dirty) {
+      if (dirty && transactionDepth === 0) {
         try { persist(); } catch (e) { console.error("[sqljs] save failed:", e); }
       }
     }, SAVE_DEBOUNCE_MS);
@@ -82,19 +85,33 @@ export async function createSqlJsAdapter(filePath) {
 
   function exec(sql) {
     db.exec(sql);
-    scheduleSave();
+    const command = String(sql).trim().match(/^(BEGIN|SAVEPOINT|COMMIT|END|RELEASE|ROLLBACK)\b/i)?.[1]?.toUpperCase();
+    if (command === "BEGIN" || command === "SAVEPOINT") {
+      if (transactionDepth === 0 && saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      dirtyBeforeTransaction.push(dirty);
+      transactionDepth++;
+    } else if (command === "COMMIT" || command === "END" || command === "RELEASE") {
+      if (transactionDepth > 0) transactionDepth--;
+      dirtyBeforeTransaction.pop();
+      if (transactionDepth === 0 && dirty) scheduleSave();
+    } else if (command === "ROLLBACK" && !/^ROLLBACK\s+TO\b/i.test(String(sql).trim())) {
+      if (transactionDepth > 0) transactionDepth--;
+      dirty = dirtyBeforeTransaction.pop() ?? dirty;
+      if (transactionDepth === 0 && dirty) scheduleSave();
+    } else if (transactionDepth === 0) {
+      scheduleSave();
+    }
   }
 
   function transaction(fn) {
     const sp = `sp_${Math.random().toString(36).slice(2)}`;
-    db.exec(`SAVEPOINT ${sp}`);
+    exec(`SAVEPOINT ${sp}`);
     try {
       const result = fn();
-      db.exec(`RELEASE ${sp}`);
-      scheduleSave();
+      exec(`RELEASE ${sp}`);
       return result;
     } catch (e) {
-      try { db.exec(`ROLLBACK TO ${sp}`); db.exec(`RELEASE ${sp}`); } catch {}
+      try { exec(`ROLLBACK TO ${sp}`); exec(`RELEASE ${sp}`); } catch {}
       throw e;
     }
   }
