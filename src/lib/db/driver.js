@@ -57,7 +57,6 @@ async function trySqlJs() {
 }
 
 async function initAdapter() {
-  ensureDirs();
   const postgresUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (postgresUrl) {
     const { createPostgresAdapter } = await import("./adapters/postgresAdapter.js");
@@ -70,6 +69,8 @@ async function initAdapter() {
     await runPostgresMigrationOnce(adapter);
     return adapter;
   }
+
+  ensureDirs();
 
   // Order per runtime:
   //   Bun:  bun:sqlite → sql.js
