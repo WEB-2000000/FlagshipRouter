@@ -4,6 +4,7 @@ import { getSettings } from "@/lib/localDb";
 import { isOidcConfigured } from "@/lib/auth/oidc";
 import { isSamlConfigured } from "@/lib/auth/saml.js";
 import { getDashboardAuthSession } from "@/lib/auth/dashboardSession";
+import { isNetlifyRuntime } from "@/lib/runtime.js";
 
 export async function GET() {
   try {
@@ -35,7 +36,8 @@ export async function GET() {
       oidcLoginLabel: (settings.oidcLoginLabel || "Sign in with OIDC").trim() || "Sign in with OIDC",
       samlConfigured: isSamlConfigured(settings),
       samlLoginLabel: (settings.samlLoginLabel || "Sign in with SAML SSO").trim() || "Sign in with SAML SSO",
-      hasPassword: !!settings.password,
+      hasPassword: !!settings.password || !!process.env.INITIAL_PASSWORD,
+      setupRequired: isNetlifyRuntime && !settings.password && !process.env.INITIAL_PASSWORD && !isOidcConfigured(settings) && !isSamlConfigured(settings),
       displayName,
       loginMethod,
       authenticated: !!session,
@@ -45,9 +47,10 @@ export async function GET() {
       samlName: samlName || null,
       samlEmail: samlEmail || null,
       samlLogin: !!session?.saml,
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({
+      error: "Authentication storage is unavailable. Please retry shortly.",
       requireLogin: true,
       authMode: "password",
       ssoType: "oidc",
@@ -65,6 +68,6 @@ export async function GET() {
       samlName: null,
       samlEmail: null,
       samlLogin: false,
-    });
+    }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

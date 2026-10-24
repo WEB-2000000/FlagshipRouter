@@ -106,7 +106,7 @@ export async function POST(request) {
       { error: `Invalid password. ${remainingBeforeLock} attempt(s) left before lockout.`, remainingBeforeLock },
       { status: 401 }
     );
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Authentication service is unavailable. Please retry shortly." }, { status: 503, headers: NO_STORE_HEADERS });
   }
 }

@@ -2,10 +2,14 @@ import fs from "node:fs";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
+import { isNetlifyRuntime } from "./runtime.js";
 
 const APP_NAME = BRAND.slug;
 
 function defaultDir() {
+  // Only disposable caches belong on the function filesystem. Application
+  // records and authentication secrets use the managed database on Netlify.
+  if (isNetlifyRuntime) return path.join(os.tmpdir(), APP_NAME);
   if (process.platform === "win32") {
     return path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), APP_NAME);
   }

@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [retryAfter, setRetryAfter] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasPassword, setHasPassword] = useState(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [authMode, setAuthMode] = useState("password");
   const [ssoType, setSsoType] = useState("oidc");
   const [oidcConfigured, setOidcConfigured] = useState(false);
@@ -46,6 +47,7 @@ export default function LoginPage() {
             return;
           }
           setHasPassword(!!data.hasPassword);
+          setSetupRequired(data.setupRequired === true);
           setAuthMode(data.authMode || "password");
           setSsoType(data.ssoType || "oidc");
           setOidcConfigured(data.oidcConfigured === true);
@@ -55,10 +57,12 @@ export default function LoginPage() {
         } else {
           // Safe fallback on non-OK response to avoid infinite loading state.
           setHasPassword(true);
+          setError("The sign-in service is temporarily unavailable. Reload this page to retry.");
         }
       } catch (err) {
         clearTimeout(timeoutId);
         setHasPassword(true);
+        setError("Unable to reach the sign-in service. Check your connection and reload this page.");
       }
     }
     checkAuth();
@@ -246,15 +250,19 @@ export default function LoginPage() {
                   variant="primary"
                   className="w-full"
                   loading={loading}
-                  disabled={retryAfter > 0}
+                  disabled={retryAfter > 0 || setupRequired}
                 >
                   {retryAfter > 0 ? `Wait ${retryAfter}s` : "Login"}
                 </Button>
 
-                <p className="text-xs text-center text-text-muted mt-2">
+                {setupRequired ? (
+                  <p role="status" className="text-xs text-center text-amber-600 dark:text-amber-400 mt-2">
+                    Administrator setup is required. Set INITIAL_PASSWORD in this project's Netlify environment variables with Functions scope, then redeploy and sign in with that password.
+                  </p>
+                ) : hasPassword === false && <p className="text-xs text-center text-text-muted mt-2">
                   Default password is <code className="bg-sidebar px-1 rounded">123456</code>
-                </p>
-                {hasPassword === false && (
+                </p>}
+                {hasPassword === false && !setupRequired && (
                   <p className="text-xs text-center text-amber-600 dark:text-amber-400">
                     Security risk: no password set. You will be asked to set one when logging in remotely.
                   </p>

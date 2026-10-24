@@ -3,28 +3,36 @@ services:
     build: .
     image: flagshiprouter:latest
     container_name: flagshiprouter
-    restart: always
+    restart: unless-stopped
+    init: true
     ports:
-      - "20128:20128"
+      - "${FLAGSHIPROUTER_BIND_ADDRESS:-127.0.0.1}:${FLAGSHIPROUTER_PORT:-20130}:20130"
     volumes:
       - flagshiprouter-data:/app/data
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DATA_DIR: /app/data
-      PORT: "20128"
+      PORT: "20130"
       HOSTNAME: "0.0.0.0"
       NODE_ENV: production
       HEADROOM_URL: http://headroom:8787
     depends_on:
       - headroom
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:20130/api/health', {signal: AbortSignal.timeout(5000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
   headroom:
     image: ghcr.io/chopratejas/headroom:latest
     container_name: headroom
-    restart: always
+    restart: unless-stopped
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
 
 volumes:
   flagshiprouter-data:

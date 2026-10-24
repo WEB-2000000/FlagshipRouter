@@ -126,6 +126,28 @@ http.createServer = (...args) => {
 };
 
 if (require.main === module) {
+  // Standalone server.js reads the environment, not CLI arguments. Keep the
+  // same launch options working in both a checkout and a packaged deployment.
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--port" || args[i] === "-p") {
+      const value = args[++i];
+      if (!/^\d+$/.test(value || "") || Number(value) < 1 || Number(value) > 65535) {
+        console.error("Port must be an integer between 1 and 65535.");
+        process.exit(1);
+      }
+      process.env.PORT = value;
+    } else if (["--host", "--hostname", "-H"].includes(args[i])) {
+      const value = args[++i];
+      if (!value || value.startsWith("-")) {
+        console.error("A hostname is required after --host.");
+        process.exit(1);
+      }
+      process.env.HOSTNAME = value;
+      // next start calls this option --hostname.
+      args[i - 1] = "--hostname";
+    }
+  }
   const standalone = path.join(__dirname, "server.js");
   if (fs.existsSync(standalone)) {
     require(standalone);
@@ -133,7 +155,7 @@ if (require.main === module) {
     // Repo checkout has no standalone build next to us. `next start` builds its HTTP
     // server in-process, so the wrapper above still sanitizes every request.
     const nextBin = require.resolve("next/dist/bin/next");
-    process.argv = [process.argv[0], nextBin, "start", ...process.argv.slice(2)];
+    process.argv = [process.argv[0], nextBin, "start", ...args];
     require(nextBin);
   }
 }

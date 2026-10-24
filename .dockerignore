@@ -1,6 +1,7 @@
 # VCS
 .git
 **/.git
+.netlify
 
 # Editor
 .vscode
@@ -24,6 +25,7 @@ logs
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
 
 # Debug logs
 npm-debug.log*

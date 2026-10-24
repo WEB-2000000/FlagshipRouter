@@ -10,16 +10,14 @@ export async function ensureOutboundProxyInitialized() {
     const settings = await getSettings();
     applyOutboundProxyEnv(settings);
     initialized = true;
-  } catch (error) {
-    console.error("[ServerInit] Error initializing outbound proxy:", error);
+  } catch {
+    console.error("[ServerInit] Outbound proxy settings are temporarily unavailable");
   }
 
   return initialized;
 }
 
-// Defer init so HTTP server accepts connections first
-setImmediate(() => {
-  ensureOutboundProxyInitialized().catch(console.log);
-});
+// Called explicitly from the dynamic dashboard layout. Importing a module
+// during build or route collection must never open application storage.
 
 export default ensureOutboundProxyInitialized;
