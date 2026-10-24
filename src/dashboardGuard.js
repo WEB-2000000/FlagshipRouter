@@ -1,22 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSettings, validateApiKey } from "@/lib/localDb";
-import { getConsistentMachineId } from "@/shared/utils/machineId";
-import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
+import { getProxyAuthContext } from "./lib/auth/proxyAuthContext";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
 
-const CLI_TOKEN_HEADER = "x-fr-cli-token";
-const CLI_TOKEN_SALT = "fr-cli-auth";
-
-let cachedCliToken = null;
-async function getCliToken() {
-  if (!cachedCliToken) cachedCliToken = await getConsistentMachineId(CLI_TOKEN_SALT);
-  return cachedCliToken;
-}
-
 async function hasValidCliToken(request) {
-  const token = request.headers.get(CLI_TOKEN_HEADER);
-  if (!token) return false;
-  return token === await getCliToken();
+  return (await getProxyAuthContext(request)).cliAuthenticated === true;
 }
 
 // Public API paths — no auth required (LLM API has its own key auth inside handler).
@@ -149,9 +136,7 @@ function extractApiKey(request) {
 }
 
 async function hasValidApiKey(request) {
-  const apiKey = extractApiKey(request);
-  if (!apiKey) return false;
-  return await validateApiKey(apiKey);
+  return (await getProxyAuthContext(request)).apiKeyAuthenticated === true;
 }
 
 async function canAccessPublicLlmApi(request) {
@@ -168,24 +153,17 @@ async function canAccessLocalOnlyRoute(request) {
 }
 
 async function hasValidToken(request) {
-  const token = request.cookies.get("auth_token")?.value;
-  return await verifyDashboardAuthToken(token);
+  return (await getProxyAuthContext(request)).tokenAuthenticated === true;
 }
 
-// Read settings directly from DB to avoid self-fetch deadlock in proxy
-async function loadSettings() {
-  try {
-    return await getSettings();
-  } catch {
-    return null;
-  }
+async function loadSettings(request) {
+  return (await getProxyAuthContext(request)).settings || null;
 }
 
 async function isAuthenticated(request) {
   if (await hasValidToken(request)) return true;
-  const settings = await loadSettings();
-  if (settings && settings.requireLogin === false) return true;
-  return false;
+  const settings = await loadSettings(request);
+  return settings?.requireLogin === false;
 }
 
 function isPublicApi(pathname) {
@@ -240,7 +218,7 @@ export async function proxy(request) {
     let tunnelDashboardAccess = true;
 
     try {
-      const settings = await loadSettings();
+      const settings = await loadSettings(request);
       if (settings) {
         requireLogin = settings.requireLogin !== false;
         tunnelDashboardAccess = settings.tunnelDashboardAccess === true;
@@ -265,7 +243,7 @@ export async function proxy(request) {
     // Verify JWT token
     const token = request.cookies.get("auth_token")?.value;
     if (token) {
-      if (await verifyDashboardAuthToken(token)) {
+      if (await hasValidToken(request)) {
         return NextResponse.next();
       } else {
         return NextResponse.redirect(new URL("/login", request.url));
