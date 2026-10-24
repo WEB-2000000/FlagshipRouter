@@ -170,7 +170,7 @@ function splitStatements(sql) {
   return statements;
 }
 
-function createPoolApi(pool) {
+export function createPoolApi(pool) {
   const context = new AsyncLocalStorage();
   let savepointId = 0;
   let api;

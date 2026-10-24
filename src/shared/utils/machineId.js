@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from '@/lib/dataDir';
+import { isNetlifyRuntime } from '@/lib/runtime.js';
 
 const MACHINE_ID_FILE = path.join(DATA_DIR, 'machine-id');
 const AUTH_DIR = path.join(DATA_DIR, 'auth');
@@ -48,13 +49,21 @@ function loadCliSecret() {
 
 export async function getConsistentMachineId(salt = null) {
   const saltValue = salt || process.env.MACHINE_ID_SALT || 'endpoint-proxy-salt';
-  const raw = loadRawMachineId();
-  const extra = saltValue === CLI_AUTH_SALT ? loadCliSecret() : '';
+  const hosted = isNetlifyRuntime;
+  const raw = await getRawMachineId();
+  const extra = saltValue === CLI_AUTH_SALT
+    ? (hosted ? await hostedSecret('cli-secret') : loadCliSecret()) : '';
   return crypto.createHash('sha256').update(raw + saltValue + extra).digest('hex').substring(0, 16);
 }
 
 export async function getRawMachineId() {
+  if (isNetlifyRuntime) return hostedSecret('machine-id');
   return loadRawMachineId();
+}
+
+async function hostedSecret(key) {
+  const { getPersistentSecret } = await import('@/lib/auth/persistentSecret.js');
+  return getPersistentSecret(key);
 }
 
 /**

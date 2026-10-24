@@ -8,25 +8,30 @@ let tempDir;
 const originalDataDir = process.env.DATA_DIR;
 
 beforeEach(() => {
+  vi.stubEnv("NETLIFY", "false");
+  vi.stubEnv("FLAGSHIPROUTER_HOSTING_RUNTIME", "local");
+  vi.stubEnv("POSTGRES_URL", "");
+  vi.stubEnv("DATABASE_URL", "");
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "flagshiprouter-chain-"));
   process.env.DATA_DIR = tempDir;
   delete global._dbAdapter;
   vi.resetModules();
 });
 
-afterEach(() => {
-  try { global._dbAdapter?.instance?.close?.(); } catch {}
+afterEach(async () => {
+  try { await global._dbAdapter?.instance?.close?.(); } catch {}
   delete global._dbAdapter;
   if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   if (originalDataDir === undefined) delete process.env.DATA_DIR;
   else process.env.DATA_DIR = originalDataDir;
+  vi.unstubAllEnvs();
 });
 
 describe("Driver fallback chain", () => {
   it("default → picks better-sqlite3 when available", async () => {
     const { getAdapter } = await import("@/lib/db/driver.js");
     const db = await getAdapter();
-    expect(["better-sqlite3", "node:sqlite", "sql.js"]).toContain(db.driver);
+    expect(["better-sqlite3-async", "node:sqlite-async", "sql.js-async"]).toContain(db.driver);
   });
 
   it("falls back to node:sqlite when better-sqlite3 unavailable", async () => {
@@ -39,9 +44,9 @@ describe("Driver fallback chain", () => {
     // Node 22.5+ should give node:sqlite, else sql.js
     const [maj, min] = process.versions.node.split(".").map(Number);
     if (maj > 22 || (maj === 22 && min >= 5)) {
-      expect(db.driver).toBe("node:sqlite");
+      expect(db.driver).toBe("node:sqlite-async");
     } else {
-      expect(db.driver).toBe("sql.js");
+      expect(db.driver).toBe("sql.js-async");
     }
   });
 
@@ -54,6 +59,6 @@ describe("Driver fallback chain", () => {
     });
     const { getAdapter } = await import("@/lib/db/driver.js");
     const db = await getAdapter();
-    expect(db.driver).toBe("sql.js");
+    expect(db.driver).toBe("sql.js-async");
   });
 });

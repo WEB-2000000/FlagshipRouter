@@ -1,4 +1,5 @@
 import { ensureDirs, DATA_FILE } from "./paths.js";
+import { isNetlifyRuntime } from "../runtime.js";
 
 // Use global to survive Next.js dev hot-reload (module state resets on reload)
 if (!global._dbAdapter) global._dbAdapter = { instance: null, initPromise: null, logged: false };
@@ -57,6 +58,13 @@ async function trySqlJs() {
 }
 
 async function initAdapter() {
+  if (isNetlifyRuntime) {
+    const { getDatabase } = await import("@netlify/database");
+    const { createPoolApi } = await import("./adapters/postgresAdapter.js");
+    // Provisioning and schema migrations belong to the deploy lifecycle.
+    // Never silently fall back to an ephemeral SQLite file in production.
+    return createPoolApi(getDatabase().pool);
+  }
   const postgresUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (postgresUrl) {
     const { createPostgresAdapter } = await import("./adapters/postgresAdapter.js");
@@ -94,7 +102,10 @@ async function initAdapter() {
 
 export async function getAdapter() {
   if (state.instance) return state.instance;
-  if (!state.initPromise) state.initPromise = initAdapter().then((a) => { state.instance = a; return a; });
+  if (!state.initPromise) state.initPromise = initAdapter().then((a) => { state.instance = a; return a; }).catch((error) => {
+    state.initPromise = null;
+    throw error;
+  });
   return state.initPromise;
 }
 

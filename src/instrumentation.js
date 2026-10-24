@@ -1,3 +1,5 @@
+import { isNetlifyRuntime } from "./lib/runtime.js";
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { initConsoleLogCapture } = await import("@/lib/consoleLogBuffer");
@@ -8,7 +10,9 @@ export async function register() {
     const { installCatalogSource } = await import("open-sse/providers/catalogOverride.js");
     await installCatalogSource();
 
-    const { startModelCatalogSync } = await import("@/lib/modelCatalog/sync.js");
-    startModelCatalogSync();
+    if (!isNetlifyRuntime) {
+      const { startModelCatalogSync } = await import("@/lib/modelCatalog/sync.js");
+      startModelCatalogSync();
+    }
   }
 }

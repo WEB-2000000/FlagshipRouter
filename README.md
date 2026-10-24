@@ -21,6 +21,37 @@ npm run launch
 
 Pass CLI options after `--`, for example `npm run launch -- --host 127.0.0.1` (local only), `-- -p 20130` (another port) or `-- --no-browser`.
 
+### Run on port 20130
+
+```bash
+npm run launch -- --host 127.0.0.1 --port 20130 --no-browser
+```
+
+Open `http://127.0.0.1:20130/dashboard`. The model endpoint is `http://127.0.0.1:20130/v1`. Keep this terminal open for an interactive launch.
+
+### Keep running after closing the terminal or rebooting
+
+Install Docker with Compose v2.24 or newer and enable Docker to start when the host boots. From the project directory, run:
+
+```bash
+npm run service:up
+npm run service:status
+```
+
+The first command builds and starts the existing Docker deployment in the background on port **20130**. Docker restarts crashed containers and starts them after reboot, unless you explicitly stopped them. The existing data volume preserves provider connections and settings. An `.env` file is optional. This deployment has its own data volume; back up and import existing CLI data through the dashboard if moving from a local installation.
+
+The dashboard is available at `http://127.0.0.1:20130/dashboard`; no CLI or browser process needs to stay open. A health check marks the container unhealthy when the application stops responding; Docker's restart policy restarts exited processes, but does not restart a running unhealthy container. Check `docker compose logs --tail 100 flagshiprouter` locally when diagnosing failures. Avoid sharing logs containing credentials. To restart manually, run `docker compose restart flagshiprouter`; to stop, run `npm run service:stop`.
+
+The port is bound to localhost by default. For direct LAN access, set `FLAGSHIPROUTER_BIND_ADDRESS=0.0.0.0` in `.env`, change the default dashboard password, and recreate the service. Set `FLAGSHIPROUTER_PORT` there to change the published port. For public access, use a TLS reverse proxy and an API key.
+
+### Diagnose “authorization service unavailable”
+
+```bash
+npm run doctor -- --port 20130
+```
+
+This checks the local application and dashboard authorization endpoints without printing response bodies or credentials. If these pass but one model fails, use that model's test in **Models** and reconnect the affected provider. If the error only appears through a domain or tunnel, compare with `http://127.0.0.1:20130/dashboard` to isolate the proxy. The exact error text is not emitted by this repository, so its source needs to be identified from the failing request; changing ports alone cannot repair provider authorization. Continuous hosting cannot guarantee external model availability, quotas, or credential validity.
+
 To use the `flagshiprouter` command anywhere, link the CLI package once:
 
 ```bash

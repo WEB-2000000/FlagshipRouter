@@ -65,5 +65,6 @@ describe("GET /api/auth/status", () => {
 
     expect(response.body.authenticated).toBe(false);
     expect(response.body.requireLogin).toBe(true);
+    expect(response.status).toBe(503);
   });
 });
