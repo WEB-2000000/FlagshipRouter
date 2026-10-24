@@ -1,4 +1,5 @@
-import { proxy as dashboardProxy, isAuthenticated } from "./dashboardGuard";
+import { NextResponse } from "next/server";
+import { AUTH_DECISION_PATH, proxy as dashboardProxy, isAuthenticated } from "./lib/middlewareAuth";
 import {
   sessionFromRequest,
   isAccountProxyPath,
@@ -11,6 +12,8 @@ import {
 } from "./lib/mimoLoginSession";
 
 export default async function proxy(request) {
+  // The decision endpoint runs in Node.js and must not recursively call middleware.
+  if (request.nextUrl.pathname === AUTH_DECISION_PATH) return NextResponse.next();
   // Xiaomi account session-login proxy (src/lib/mimoLoginSession.js).
   // Session state (region + accumulated cookie jar) travels in the httpOnly
   // 9r_mimo_login cookie — route handlers and this proxy run in separate
