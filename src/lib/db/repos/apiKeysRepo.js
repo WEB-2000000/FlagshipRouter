@@ -3,6 +3,14 @@ import { getAdapter } from "../driver.js";
 
 function rowToKey(row) {
   if (!row) return null;
+  let access = null;
+  if (row.access) {
+    try {
+      access = typeof row.access === "string" ? JSON.parse(row.access) : row.access;
+    } catch {
+      access = null;
+    }
+  }
   return {
     id: row.id,
     key: row.key,
@@ -10,6 +18,7 @@ function rowToKey(row) {
     machineId: row.machineId,
     isActive: row.isActive === 1 || row.isActive === true,
     createdAt: row.createdAt,
+    access,
   };
 }
 
@@ -22,6 +31,13 @@ export async function getApiKeys() {
 export async function getApiKeyById(id) {
   const db = await getAdapter();
   const row = (await db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]));
+  return rowToKey(row);
+}
+
+export async function getApiKeyByKey(key) {
+  if (!key) return null;
+  const db = await getAdapter();
+  const row = (await db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]));
   return rowToKey(row);
 }
 

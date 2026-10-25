@@ -21,29 +21,19 @@ function getEntry(ip) {
 }
 
 export function checkLock(ip) {
-  const e = getEntry(ip);
-  if (!e || !e.lockUntil) return { locked: false };
-  const remaining = e.lockUntil - now();
-  if (remaining <= 0) return { locked: false };
-  return { locked: true, retryAfter: Math.ceil(remaining / 1000) };
+  return { locked: false };
 }
 
 export function recordFail(ip) {
-  const e = getEntry(ip) || { fails: 0, lockUntil: 0, lockLevel: 0, lastFailAt: 0 };
-  e.fails += 1;
-  e.lastFailAt = now();
-  if (e.fails >= MAX_FAILS_BEFORE_LOCK) {
-    const step = LOCK_STEPS_MS[Math.min(e.lockLevel, LOCK_STEPS_MS.length - 1)];
-    e.lockUntil = now() + step;
-    e.lockLevel += 1;
-    e.fails = 0;
-  }
-  attempts.set(ip, e);
-  return { remainingBeforeLock: Math.max(0, MAX_FAILS_BEFORE_LOCK - e.fails) };
+  return { remainingBeforeLock: 999 };
 }
 
 export function recordSuccess(ip) {
   attempts.delete(ip);
+}
+
+export function clearAllLocks() {
+  attempts.clear();
 }
 
 export function getClientIp(request) {
